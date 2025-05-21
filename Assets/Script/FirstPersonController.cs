@@ -1,0 +1,164 @@
+using UnityEngine;
+
+[RequireComponent(typeof(CharacterController))]
+public class FirstPersonController : MonoBehaviour
+{
+    [Header("Movement Settings")]
+    [SerializeField] private float walkSpeed = 5f;
+    [SerializeField] private float runSpeed = 10f;
+    [SerializeField] private float crouchSpeed = 2.5f;
+    [SerializeField] private float crouchYOffset = -0.5f; // 摄像头下移距离
+    [SerializeField] private float crouchTransitionSpeed = 5f;
+    [SerializeField] private float jumpHeight = 1.5f;
+    [SerializeField] private float gravity = -9.81f;
+
+    [Header("Look Settings")]
+    [SerializeField] private float mouseSensitivity = 100f;
+    [SerializeField] private Transform cameraTransform;
+    [SerializeField] private Transform flashlightTransform; // 手电筒的Transform
+
+    [Header("Flashlight Settings")]
+    [SerializeField] private Light flashlight;
+    [SerializeField] private KeyCode flashlightKey = KeyCode.Mouse1;
+
+    private CharacterController controller;
+    private Vector3 velocity;
+    private float originalCameraY; // 摄像头原始Y位置
+    private float targetCameraYOffset; // 目标摄像头Y偏移
+    private float currentCameraYOffset; // 当前摄像头Y偏移
+    private bool isCrouching = false;
+    private bool isRunning = false;
+
+    private void Awake()
+    {
+        controller = GetComponent<CharacterController>();
+        originalCameraY = cameraTransform.localPosition.y;
+        
+        // 如果没指定手电筒Transform，尝试自动获取
+        if (flashlightTransform == null && flashlight != null)
+            flashlightTransform = flashlight.transform;
+        
+        // 初始化时将手电筒设为摄像头的子物体
+        if (flashlightTransform != null && cameraTransform != null)
+        {
+            flashlightTransform.SetParent(cameraTransform);
+            flashlightTransform.localPosition = Vector3.zero; // 重置本地位置
+            flashlightTransform.localRotation = Quaternion.identity; // 重置本地旋转
+        }
+        
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+        
+        if (flashlight != null)
+            flashlight.enabled = false;
+    }
+
+    private void Update()
+    {
+        HandleMovement();
+        HandleMouseLook();
+        HandleFlashlight();
+        HandleCrouch();
+        HandleRun();
+        ApplyGravity();
+        UpdateCrouchPosition();
+    }
+
+    private void UpdateCrouchPosition()
+    {
+        // 平滑过渡摄像头位置
+        currentCameraYOffset = Mathf.Lerp(
+            currentCameraYOffset, 
+            targetCameraYOffset, 
+            crouchTransitionSpeed * Time.deltaTime
+        );
+        
+        // 更新摄像头和手电筒位置
+        Vector3 cameraPos = cameraTransform.localPosition;
+        cameraTransform.localPosition = new Vector3(
+            cameraPos.x, 
+            originalCameraY + currentCameraYOffset, 
+            cameraPos.z
+        );
+        
+        // 同步更新手电筒位置(如果存在)
+        if (flashlightTransform != null)
+        {
+            Vector3 flashlightPos = flashlightTransform.localPosition;
+            flashlightTransform.localPosition = new Vector3(
+                flashlightPos.x,
+                originalCameraY + currentCameraYOffset,
+                flashlightPos.z
+            );
+        }
+    }
+
+    private void HandleMovement()
+    {
+        float currentSpeed = isCrouching ? crouchSpeed : (isRunning ? runSpeed : walkSpeed);
+        
+        float x = Input.GetAxis("Horizontal");
+        float z = Input.GetAxis("Vertical");
+        
+        Vector3 move = transform.right * x + transform.forward * z;
+        controller.Move(move * currentSpeed * Time.deltaTime);
+    }
+
+    private void HandleMouseLook()
+    {
+        float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity * Time.deltaTime;
+        float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity * Time.deltaTime;
+
+        // 左右旋转角色
+        transform.Rotate(Vector3.up * mouseX);
+
+        // 上下旋转相机
+        Vector3 currentRotation = cameraTransform.localEulerAngles;
+        float newXRotation = currentRotation.x - mouseY;
+        
+        // 限制上下视角范围
+        newXRotation = Mathf.Clamp(newXRotation > 180 ? newXRotation - 360 : newXRotation, -90f, 90f);
+        cameraTransform.localEulerAngles = new Vector3(newXRotation, 0f, 0f);
+        
+        // 手电筒现在会自动跟随摄像头旋转，因为它是摄像头的子物体
+    }
+
+
+    private void HandleFlashlight()
+    {
+        if (Input.GetKeyDown(flashlightKey) && flashlight != null)
+        {
+            flashlight.enabled = !flashlight.enabled;
+        }
+    }
+
+    private void HandleCrouch()
+    {
+        if (Input.GetKeyDown(KeyCode.LeftControl))
+        {
+            isCrouching = true;
+            targetCameraYOffset = crouchYOffset;
+        }
+        else if (Input.GetKeyUp(KeyCode.LeftControl))
+        {
+            isCrouching = false;
+            targetCameraYOffset = 0f;
+        }
+    }
+
+    private void HandleRun()
+    {
+        isRunning = Input.GetKey(KeyCode.LeftShift) && !isCrouching;
+    }
+
+    private void ApplyGravity()
+    {
+        if (controller.isGrounded && velocity.y < 0)
+        {
+            velocity.y = -2f;
+        }
+
+        velocity.y += gravity * Time.deltaTime;
+        controller.Move(velocity * Time.deltaTime);
+    }
+}
