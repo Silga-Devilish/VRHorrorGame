@@ -54,8 +54,9 @@ public class FirstPersonController : MonoBehaviour
         if (flashlightTransform != null && cameraTransform != null)
         {
             flashlightTransform.SetParent(cameraTransform);
-            flashlightTransform.localPosition = Vector3.zero; // 重置本地位置
-            flashlightTransform.localRotation = Quaternion.identity; // 重置本地旋转
+            // 不再重置本地位置和旋转，保留编辑器中的设置
+            // flashlightTransform.localPosition = Vector3.zero;
+            // flashlightTransform.localRotation = Quaternion.identity;
         }
 
         Cursor.lockState = CursorLockMode.Locked;
@@ -85,7 +86,7 @@ public class FirstPersonController : MonoBehaviour
             crouchTransitionSpeed * Time.deltaTime
         );
         
-        // 更新摄像头和手电筒位置
+        // 只更新摄像头位置，手电筒位置由父物体关系自动处理
         Vector3 cameraPos = cameraTransform.localPosition;
         cameraTransform.localPosition = new Vector3(
             cameraPos.x, 
@@ -93,16 +94,7 @@ public class FirstPersonController : MonoBehaviour
             cameraPos.z
         );
         
-        // 同步更新手电筒位置(如果存在)
-        if (flashlightTransform != null)
-        {
-            Vector3 flashlightPos = flashlightTransform.localPosition;
-            flashlightTransform.localPosition = new Vector3(
-                flashlightPos.x,
-                originalCameraY + currentCameraYOffset,
-                flashlightPos.z
-            );
-        }
+        // 移除了对手电筒位置的直接控制
     }
 
     private void HandleMovement()
