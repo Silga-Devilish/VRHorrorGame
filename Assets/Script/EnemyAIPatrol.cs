@@ -10,21 +10,34 @@ public class EnemyAIPatrol : MonoBehaviour
     [SerializeField] private float detectionRange = 10f;
     [SerializeField] private float chaseRange = 15f;
     [SerializeField] private float chaseSpeed = 4f;
-    [SerializeField] private float loseSightTime = 3f; // 新增：丢失视野后多久脱战
+    [SerializeField] private float loseSightTime = 3f;
 
     [Header("视野设置")]
     [SerializeField] private float fieldOfViewAngle = 110f;
+    [SerializeField] private float closeRangeDetection = 2f;
     [SerializeField] private LayerMask obstacleMask;
 
+    [Header("听觉设置")]
+    [SerializeField] private float walkSoundDetectionRange = 4f;
+    [SerializeField] private float runSoundDetectionRange = 12f;
+    [SerializeField] private float loudSoundDetectionRange = 20f;
+    [SerializeField] private float soundInvestigationTime = 5f;
+    [SerializeField] private float soundCheckInterval = 0.3f; // 新增：声音检测间隔
+
+    private float soundCheckTimer; // 新增：声音检测计时器
     private NavMeshAgent navAgent;
     private Transform player;
+    private FirstPersonController playerController; // 新增：获取玩家控制器
     private int currentPatrolIndex = 0;
     private float waitCounter;
     private bool isWaiting = false;
     private bool isChasing = false;
+    private bool isInvestigating = false; // 新增：是否正在调查
     private Vector3 lastKnownPlayerPosition;
-    private float lostSightTimer; // 新增：丢失视野计时器
-    
+    private Vector3 soundPosition; // 新增：最后听到的声音位置
+    private float lostSightTimer;
+    private float investigationTimer; // 新增：调查计时器
+    private float lastSoundTime; // 新增：最后听到声音的时间
 
     private void Awake()
     {
@@ -43,6 +56,13 @@ public class EnemyAIPatrol : MonoBehaviour
             return;
         }
 
+        // 新增：获取玩家控制器
+        playerController = player.GetComponent<FirstPersonController>();
+        if (playerController == null)
+        {
+            Debug.LogError("玩家对象上没有找到FirstPersonController组件！");
+        }
+
         if (patrolPoints != null && patrolPoints.Length > 0)
         {
             navAgent.speed = patrolSpeed;
@@ -59,12 +79,21 @@ public class EnemyAIPatrol : MonoBehaviour
     {
         if (player == null) return;
 
+        // 更新声音检测计时器
+        soundCheckTimer += Time.deltaTime;
+        if (soundCheckTimer >= soundCheckInterval)
+        {
+            soundCheckTimer = 0f;
+            // 无论什么状态都检测声音
+            CheckForSounds();
+        }
+
         bool canSeePlayer = CanSeePlayer();
         
         if (canSeePlayer)
         {
             lastKnownPlayerPosition = player.position;
-            lostSightTimer = 0f; // 重置丢失视野计时器
+            lostSightTimer = 0f;
             
             if (!isChasing)
             {
@@ -89,9 +118,97 @@ public class EnemyAIPatrol : MonoBehaviour
                 StopChasing();
             }
         }
+        else if (isInvestigating)
+        {
+            InvestigateSound();
+        }
         else if (patrolPoints != null && patrolPoints.Length > 0)
         {
             Patrol();
+        }
+    }
+
+    // 新增方法：检测玩家发出的声音
+    private void CheckForSounds()
+    {
+        if (playerController == null) return;
+
+        // 新增：检查玩家是否在移动
+        bool isPlayerMoving = playerController.IsMoving(); // 需要在FirstPersonController中添加这个方法
+
+        float distanceToPlayer = Vector3.Distance(transform.position, player.position);
+        float soundRange = 0f;
+
+        // 只有当玩家在移动时才产生声音
+        if (isPlayerMoving)
+        {
+            if (playerController.IsRunning && !playerController.IsCrouching)
+            {
+                soundRange = runSoundDetectionRange;
+            }
+            else if (!playerController.IsCrouching)
+            {
+                soundRange = walkSoundDetectionRange;
+            }
+        }
+
+        // 检查是否在声音范围内
+        if (soundRange > 0 && distanceToPlayer <= soundRange)
+        {
+            soundPosition = player.position;
+            lastSoundTime = Time.time;
+            if (!isInvestigating && !isChasing)
+            {
+                StartInvestigation();
+            }
+            Debug.Log($"<color=cyan>听到玩家声音！前往调查位置: {soundPosition}</color>");
+        }
+    }
+
+    // 新增方法：开始调查声音
+    private void StartInvestigation()
+    {
+        isInvestigating = true;
+        investigationTimer = 0f;
+        navAgent.speed = patrolSpeed * 1.2f; // 调查时稍微快一点
+        navAgent.SetDestination(soundPosition);
+        Debug.Log($"<color=cyan>开始调查声音来源...</color>");
+    }
+
+    // 新增方法：调查声音
+    private void InvestigateSound()
+    {
+        investigationTimer += Time.deltaTime;
+
+        // 如果到达声音位置或调查时间结束
+        if (navAgent.remainingDistance <= navAgent.stoppingDistance || 
+            investigationTimer >= soundInvestigationTime)
+        {
+            isInvestigating = false;
+            
+            // 返回最近的巡逻点
+            if (patrolPoints != null && patrolPoints.Length > 0)
+            {
+                currentPatrolIndex = FindNearestPatrolPoint();
+                navAgent.SetDestination(patrolPoints[currentPatrolIndex].position);
+                Debug.Log($"<color=cyan>调查结束，返回巡逻点: {patrolPoints[currentPatrolIndex].name}</color>");
+            }
+        }
+    }
+
+    // 新增方法：触发大声响(可由其他脚本调用)
+    public void TriggerLoudSound(Vector3 position)
+    {
+        float distance = Vector3.Distance(transform.position, position);
+        if (distance <= loudSoundDetectionRange)
+        {
+            soundPosition = position;
+            lastSoundTime = Time.time;
+            if (!isChasing)
+            {
+                StartInvestigation();
+            }
+            Debug.Log($"<color=orange>听到大声响！前往调查位置: {position}</color>");
         }
     }
 
@@ -102,14 +219,27 @@ public class EnemyAIPatrol : MonoBehaviour
         Vector3 directionToPlayer = player.position - transform.position;
         float distanceToPlayer = directionToPlayer.magnitude;
         
-        // 1. 检查是否在检测范围内
+        // 1. 检查是否在近身检测范围内（无视视野角度，但检查障碍物）
+        if (distanceToPlayer <= closeRangeDetection)
+        {
+            if (!Physics.Raycast(transform.position + Vector3.up * 0.5f,
+                               directionToPlayer.normalized, 
+                               distanceToPlayer, 
+                               obstacleMask))
+            {
+                Debug.Log("<color=orange>玩家进入近身范围，且未被阻挡，强制检测！</color>");
+                return true;
+            }
+        }
+        
+        // 2. 检查是否在常规检测范围内
         if (distanceToPlayer > detectionRange) return false;
         
-        // 2. 检查是否在视野角度内
+        // 3. 检查是否在视野角度内
         float angleToPlayer = Vector3.Angle(transform.forward, directionToPlayer.normalized);
         if (angleToPlayer > fieldOfViewAngle / 2f) return false;
         
-        // 3. 检查视线是否被阻挡
+        // 4. 检查视线是否被阻挡
         if (Physics.Raycast(transform.position + Vector3.up * 0.5f,
                           directionToPlayer.normalized, 
                           distanceToPlayer, 
@@ -124,6 +254,7 @@ public class EnemyAIPatrol : MonoBehaviour
     private void StartChasing()
     {
         isChasing = true;
+        isInvestigating = false; // 停止调查状态
         navAgent.speed = chaseSpeed;
         Debug.Log($"<color=red>发现玩家！开始追逐！</color>");
     }
@@ -145,7 +276,6 @@ public class EnemyAIPatrol : MonoBehaviour
         navAgent.speed = patrolSpeed;
         lostSightTimer = 0f;
         
-        // 寻找最近的巡逻点
         if (patrolPoints != null && patrolPoints.Length > 0)
         {
             currentPatrolIndex = FindNearestPatrolPoint();
@@ -154,7 +284,6 @@ public class EnemyAIPatrol : MonoBehaviour
         }
     }
 
-    // 新增方法：寻找最近的巡逻点
     private int FindNearestPatrolPoint()
     {
         int nearestIndex = 0;
@@ -203,9 +332,23 @@ public class EnemyAIPatrol : MonoBehaviour
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(transform.position, detectionRange);
 
+        // 绘制近身检测范围
+        Gizmos.color = Color.magenta;
+        Gizmos.DrawWireSphere(transform.position, closeRangeDetection);
+
         // 绘制追击范围
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(transform.position, chaseRange);
+        
+        // 绘制声音检测范围的线框
+        Gizmos.color = Color.cyan;
+        Gizmos.DrawWireSphere(transform.position, walkSoundDetectionRange);
+        
+        Gizmos.color = Color.blue;
+        Gizmos.DrawWireSphere(transform.position, runSoundDetectionRange);
+        
+        Gizmos.color = new Color(1, 0.5f, 0); // 橙色
+        Gizmos.DrawWireSphere(transform.position, loudSoundDetectionRange);
 
         // 绘制视野锥形
         Gizmos.color = Color.blue;

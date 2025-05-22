@@ -28,16 +28,28 @@ public class FirstPersonController : MonoBehaviour
     private float currentCameraYOffset; // 当前摄像头Y偏移
     private bool isCrouching = false;
     private bool isRunning = false;
+    
+    public bool IsRunning => isRunning;
+    public bool IsCrouching => isCrouching;
+
+        public bool IsMoving()
+    {
+        // 检查是否有输入或速度大于某个阈值
+        return Mathf.Abs(Input.GetAxis("Horizontal")) > 0.1f || 
+            Mathf.Abs(Input.GetAxis("Vertical")) > 0.1f ||
+            controller.velocity.magnitude > 0.1f;
+    }
+
 
     private void Awake()
     {
         controller = GetComponent<CharacterController>();
         originalCameraY = cameraTransform.localPosition.y;
-        
+
         // 如果没指定手电筒Transform，尝试自动获取
         if (flashlightTransform == null && flashlight != null)
             flashlightTransform = flashlight.transform;
-        
+
         // 初始化时将手电筒设为摄像头的子物体
         if (flashlightTransform != null && cameraTransform != null)
         {
@@ -45,10 +57,10 @@ public class FirstPersonController : MonoBehaviour
             flashlightTransform.localPosition = Vector3.zero; // 重置本地位置
             flashlightTransform.localRotation = Quaternion.identity; // 重置本地旋转
         }
-        
+
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
-        
+
         if (flashlight != null)
             flashlight.enabled = false;
     }

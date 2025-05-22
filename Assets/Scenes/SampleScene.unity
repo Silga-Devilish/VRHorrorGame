@@ -106,7 +106,7 @@ NavMeshSettings:
   m_BuildSettings:
     serializedVersion: 3
     agentTypeID: 0
-    agentRadius: 0.24
+    agentRadius: 0.13
     agentHeight: 2
     agentSlope: 45
     agentClimb: 0.4
@@ -114,7 +114,7 @@ NavMeshSettings:
     maxJumpAcrossDistance: 0
     minRegionArea: 2
     manualCellSize: 0
-    cellSize: 0.08
+    cellSize: 0.043333333
     manualTileSize: 0
     tileSize: 256
     buildHeightMesh: 0
@@ -1227,13 +1227,20 @@ MonoBehaviour:
   - {fileID: 1113618237}
   patrolSpeed: 2
   waitTimeAtPoint: 2
-  detectionRange: 10
+  detectionRange: 5
   chaseRange: 15
-  chaseSpeed: 3
-  fieldOfViewAngle: 90
+  chaseSpeed: 2
+  loseSightTime: 3
+  fieldOfViewAngle: 180
+  closeRangeDetection: 1
   obstacleMask:
     serializedVersion: 2
     m_Bits: 8
+  walkSoundDetectionRange: 10
+  runSoundDetectionRange: 15
+  loudSoundDetectionRange: 20
+  soundInvestigationTime: 5
+  soundCheckInterval: 0.3
 --- !u!195 &386753067
 NavMeshAgent:
   m_ObjectHideFlags: 0
@@ -1253,7 +1260,7 @@ NavMeshAgent:
   m_AutoBraking: 1
   m_AutoRepath: 1
   m_Height: 1
-  m_BaseOffset: 0.33
+  m_BaseOffset: 0.47
   m_WalkableMask: 4294967295
   m_ObstacleAvoidanceType: 4
 --- !u!4 &386753068
@@ -2830,9 +2837,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ece8157b4d973ad4c9ea6800c56e109c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  walkSpeed: 2
-  runSpeed: 4
-  crouchSpeed: 1
+  walkSpeed: 5
+  runSpeed: 8
+  crouchSpeed: 3
   crouchYOffset: -0.7
   crouchTransitionSpeed: 5
   jumpHeight: 1.5
