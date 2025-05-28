@@ -9,12 +9,15 @@ public class PlayerInteraction : MonoBehaviour
     [SerializeField] private KeyCode interactKey = KeyCode.E;
     [SerializeField] private LayerMask interactableLayer;
     [SerializeField] private float repairTime = 3f;
-    
+
     [Header("UI设置")]
     [SerializeField] private GameObject repairProgressUI;
     [SerializeField] private Image repairProgressBar;
     [SerializeField] private TextMeshProUGUI repairPromptText;
-    
+
+    [Header("发条盒交互")]
+    [SerializeField] private float windUpInteractionDistance = 2f;
+    private WindUpBoxController currentWindUpBox;
     private Camera playerCamera;
     private LightSwitchController currentSwitch;
     private FuseBox currentFuseBox;
@@ -32,10 +35,21 @@ public class PlayerInteraction : MonoBehaviour
     private void Update()
     {
         CheckLookingAtInteractable();
-        
+
         HandleRepairInteraction();
-        
+
         HandleSwitchInteraction();
+
+        // 在Update方法中添加
+        if (Input.GetKeyDown(KeyCode.E))
+        {
+            TryInteractWithWindUpBox();
+        }
+
+        if (Input.GetKeyUp(KeyCode.E) && currentWindUpBox != null)
+        {
+            currentWindUpBox.StopWinding();
+        }
     }
 
     private void CheckLookingAtInteractable()
@@ -45,11 +59,11 @@ public class PlayerInteraction : MonoBehaviour
         {
             LightSwitchController switchCtrl = hit.collider.GetComponent<LightSwitchController>();
             FuseBox fuseBox = hit.collider.GetComponent<FuseBox>();
-            
+
             if (switchCtrl != currentSwitch || fuseBox != currentFuseBox)
             {
                 ClearCurrentInteractable();
-                
+
                 if (switchCtrl != null)
                 {
                     currentSwitch = switchCtrl;
@@ -72,7 +86,7 @@ public class PlayerInteraction : MonoBehaviour
     {
         if (currentSwitch != null) currentSwitch.ShowPrompt(false);
         if (currentFuseBox != null) currentFuseBox.ShowPrompt(false);
-        
+
         currentSwitch = null;
         currentFuseBox = null;
         ResetRepair();
@@ -81,20 +95,20 @@ public class PlayerInteraction : MonoBehaviour
     private void HandleRepairInteraction()
     {
         if (currentFuseBox == null) return;
-        
+
         if (Input.GetKeyDown(interactKey) && inventory.HasFuse && !currentFuseBox.IsRepaired)
         {
             currentFuseBox.StartRepairingSound(); // 新增：开始修理音效
             StartRepair();
         }
-        
+
         if (isRepairing)
         {
             if (Input.GetKey(interactKey))
             {
                 repairTimer += Time.deltaTime;
                 repairProgressBar.fillAmount = repairTimer / repairTime;
-                
+
                 if (repairTimer >= repairTime)
                 {
                     CompleteRepair();
@@ -135,6 +149,20 @@ public class PlayerInteraction : MonoBehaviour
         if (currentSwitch != null && Input.GetKeyDown(interactKey))
         {
             currentSwitch.InteractWithSwitch();
+        }
+    }
+    
+    private void TryInteractWithWindUpBox()
+    {
+        Ray ray = new Ray(playerCamera.transform.position, playerCamera.transform.forward);
+        if (Physics.Raycast(ray, out RaycastHit hit, windUpInteractionDistance))
+        {
+            WindUpBoxController windUpBox = hit.collider.GetComponent<WindUpBoxController>();
+            if (windUpBox != null)
+            {
+                currentWindUpBox = windUpBox;
+                windUpBox.StartWinding();
+            }
         }
     }
 }

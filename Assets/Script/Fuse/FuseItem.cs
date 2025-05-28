@@ -16,6 +16,7 @@ public class FuseItem : MonoBehaviour
         }
 
         inventory.AddFuse();
+        FindObjectOfType<TaskManager>()?.CompleteTask(0);
         Destroy(gameObject);
         
         Debug.Log("保险丝已拾取");

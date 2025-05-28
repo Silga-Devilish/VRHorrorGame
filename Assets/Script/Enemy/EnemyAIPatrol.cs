@@ -33,6 +33,12 @@ public class EnemyAIPatrol : MonoBehaviour
     [SerializeField] private float chaseStepVolume = 0.7f;
     [SerializeField] private float footstepPitchRandomness = 0.1f;
 
+    [Header("动画设置")]
+    [SerializeField] private Animator enemyAnimator;
+    [SerializeField] private string speedParam = "Speed";
+    [SerializeField] private string chasingParam = "IsChasing";
+    [SerializeField] private string investigatingParam = "IsInvestigating";
+
     private AudioSource footstepSource;
     private float stepCycle;
     private float nextStep;
@@ -163,6 +169,8 @@ public class EnemyAIPatrol : MonoBehaviour
         {
             ProgressStepCycle();
         }
+
+        UpdateAnimations();
     }
 
     // 新增方法：检测玩家发出的声音
@@ -170,7 +178,7 @@ public class EnemyAIPatrol : MonoBehaviour
     {
         if (playerController == null) return;
 
-         bool isPlayerMoving = playerController.IsMoving;
+        bool isPlayerMoving = playerController.IsMoving;
         float distanceToPlayer = Vector3.Distance(transform.position, player.position);
         float soundRange = 0f;
 
@@ -213,16 +221,16 @@ public class EnemyAIPatrol : MonoBehaviour
             navAgent.SetDestination(soundPosition);
             return;
         }
-        
+
         // 到达后才开始计时
         investigationTimer += Time.deltaTime;
-        
+
         // 检查调查时间是否结束
         if (investigationTimer >= soundInvestigationTime)
         {
             isInvestigating = false;
             investigationTimer = 0f;
-            
+
             // 返回最近的巡逻点
             if (patrolPoints != null && patrolPoints.Length > 0)
             {
@@ -247,13 +255,13 @@ public class EnemyAIPatrol : MonoBehaviour
     private void UpdateSoundPosition(Vector3 newPosition, bool isLoudSound = false)
     {
         // 如果是大声响或者当前没有在调查/追逐，或者新声音更近
-        if (isLoudSound || !isInvestigating || !isChasing || 
-            Vector3.Distance(transform.position, newPosition) < 
+        if (isLoudSound || !isInvestigating || !isChasing ||
+            Vector3.Distance(transform.position, newPosition) <
             Vector3.Distance(transform.position, soundPosition))
         {
             soundPosition = newPosition;
             lastSoundTime = Time.time;
-            
+
             if (!isChasing)
             {
                 StartInvestigation();
@@ -315,7 +323,7 @@ public class EnemyAIPatrol : MonoBehaviour
             StopChasing();
             return;
         }
-        
+
         navAgent.SetDestination(player.position);
     }
 
@@ -324,7 +332,7 @@ public class EnemyAIPatrol : MonoBehaviour
         isChasing = false;
         navAgent.speed = patrolSpeed;
         lostSightTimer = 0f;
-        
+
         if (patrolPoints != null && patrolPoints.Length > 0)
         {
             currentPatrolIndex = FindNearestPatrolPoint();
@@ -337,7 +345,7 @@ public class EnemyAIPatrol : MonoBehaviour
     {
         int nearestIndex = 0;
         float minDistance = float.MaxValue;
-        
+
         for (int i = 0; i < patrolPoints.Length; i++)
         {
             float distance = Vector3.Distance(transform.position, patrolPoints[i].position);
@@ -347,7 +355,7 @@ public class EnemyAIPatrol : MonoBehaviour
                 nearestIndex = i;
             }
         }
-        
+
         return nearestIndex;
     }
 
@@ -396,7 +404,7 @@ public class EnemyAIPatrol : MonoBehaviour
         int randomIndex = Random.Range(0, remainingPatrolIndices.Count);
         int nextIndex = remainingPatrolIndices[randomIndex];
         remainingPatrolIndices.RemoveAt(randomIndex);
-        
+
         return nextIndex;
     }
     private void ProgressStepCycle()
@@ -405,7 +413,7 @@ public class EnemyAIPatrol : MonoBehaviour
         stepCycle += speed * Time.deltaTime;
 
         float interval = isChasing ? chaseStepInterval : patrolStepInterval;
-        
+
         if (stepCycle > nextStep)
         {
             nextStep = stepCycle + interval;
@@ -455,5 +463,15 @@ public class EnemyAIPatrol : MonoBehaviour
         Gizmos.DrawLine(transform.position, transform.position + leftBoundary);
         Gizmos.DrawLine(transform.position, transform.position + rightBoundary);
         Gizmos.DrawLine(transform.position + rightBoundary, transform.position + leftBoundary);
+    }
+    
+        private void UpdateAnimations()
+    {
+        if (enemyAnimator == null) return;
+        
+        float speed = navAgent.velocity.magnitude / navAgent.speed;
+        enemyAnimator.SetFloat(speedParam, speed);
+        enemyAnimator.SetBool(chasingParam, isChasing);
+        enemyAnimator.SetBool(investigatingParam, isInvestigating);
     }
 }

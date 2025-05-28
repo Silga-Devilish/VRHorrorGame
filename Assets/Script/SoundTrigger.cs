@@ -43,7 +43,7 @@ public class SoundTrigger : MonoBehaviour
         }
     }
 
-    private void TriggerSoundEffect()
+    public void TriggerSoundEffect()
     {
         hasTriggered = true;
 
